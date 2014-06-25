@@ -27,7 +27,7 @@ Any errors in the compilation or linking will be printed to the console.
 References to shader attributes and uniforms can be acquired using `glUtils.getGLVars()`:
 
 ```JavaScript
-  var gl_vars = glUtils.getGLVars(gl, gl.program, {
+  var gl_vars = glUtils.getGLVars(gl, program, {
     attributes: ["aPosition", "aColor"],
     uniforms: ["uMVP"]
   });
