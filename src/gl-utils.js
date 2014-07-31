@@ -85,9 +85,11 @@
       gl.enableVertexAttribArray(attribute);
     },
 
-    createBox: function createBox(params) {
-      var position = params.position || [0, 0, 0];
-      var dimensions = params.dimensions || [1, 1, 1];
+    createBox: function createBox(options) {
+      options = options || {};
+
+      var dimensions = options.dimensions || [1, 1, 1];
+      var position = options.position || [-dimensions[0] / 2, -dimensions[1] / 2, -dimensions[2] / 2];
       var x = position[0];
       var y = position[1];
       var z = position[2];
@@ -154,12 +156,61 @@
         fbr.x, fbr.y, fbr.z,
       ]);
 
+      var texture_coords = new Float32Array([
+        //front
+        0, 0,
+        1, 0,
+        0, 1,
+        0, 1,
+        1, 0,
+        1, 1,
+
+        //right
+        0, 0,
+        1, 0,
+        0, 1,
+        0, 1,
+        1, 0,
+        1, 1,
+
+        //back
+        0, 0,
+        1, 0,
+        0, 1,
+        0, 1,
+        1, 0,
+        1, 1,
+
+        //left
+        0, 0,
+        1, 0,
+        0, 1,
+        0, 1,
+        1, 0,
+        1, 1,
+
+        //top
+        0, 0,
+        1, 0,
+        0, 1,
+        0, 1,
+        1, 0,
+        1, 1,
+
+        //bottom
+        0, 0,
+        1, 0,
+        0, 1,
+        0, 1,
+        1, 0,
+        1, 1
+      ]);
+
       var normals = new Float32Array(vertices.length);
       var i, count;
-      var ci, ni;
+      var ni;
 
       for (i = 0, count = vertices.length / 3; i < count; i++) {
-        ci = i * 4;
         ni = i * 3;        
 
         normals[ni] = parseInt(i / 6, 10) === 1 ? 1 : 
@@ -175,12 +226,15 @@
 
       return {
         vertices: vertices,
-        normals: normals
+        normals: normals,
+        texture_coords: texture_coords
       };
 
     },
 
     createSphere: function(options) {
+      options = options || {};
+
       var position = options.position || [0, 0, 0];
       var long_bands = options.long_bands || 10;
       var lat_bands = options.lat_bands || 10;
@@ -191,15 +245,18 @@
       var lat_angle, long_angle;
       var vertices = new Float32Array(num_vertices * 3);
       var normals = new Float32Array(num_vertices * 3);
+      var texture_coords = new Float32Array(num_vertices * 2);
       var ox = position[0];
       var oy = position[1];
       var oz = position[2];
       var x1, x2, x3, x4,
           y1, y2,
-          z1, z2, z3, z4;
+          z1, z2, z3, z4,
+          u1, u2,
+          v1, v2;
       var i, j;
       var k = 0;
-      var vi, ci;
+      var vi, ti;
 
       for (i = 0; i < lat_bands; i++) {
         lat_angle = i * lat_step;
@@ -215,9 +272,12 @@
           z2 = Math.sin(lat_angle) * Math.sin(long_angle + long_step);
           z3 = Math.sin(lat_angle + lat_step) * Math.sin(long_angle);
           z4 = Math.sin(lat_angle + lat_step) * Math.sin(long_angle + long_step);
-
+          u1 = 1 - j / long_bands;
+          u2 = 1 - (j + 1) / long_bands;
+          v1 = 1 - i / lat_bands;
+          v2 = 1 - (i + 1) / lat_bands;
           vi = k * 3;
-          ci = k * 4;
+          ti = k * 2;
 
           vertices[vi] = x1 * radius + ox; 
           vertices[vi+1] = y1 * radius + oy; 
@@ -238,24 +298,37 @@
           vertices[vi+16] = y1 * radius + oy; 
           vertices[vi+17] = z2 * radius + oz;
 
-          normals[vi] = x1; 
+          normals[vi] = x1;
           normals[vi+1] = y1; 
           normals[vi+2] = z1;
-          normals[vi+3] = x3; 
+          normals[vi+3] = x3;
           normals[vi+4] = y2; 
           normals[vi+5] = z3;
-          normals[vi+6] = x2; 
+          normals[vi+6] = x2;
           normals[vi+7] = y1; 
           normals[vi+8] = z2;
-          normals[vi+9] = x3; 
+          normals[vi+9] = x3;
           normals[vi+10] = y2; 
-          normals[vi+11] = z3;
-          normals[vi+12] = x4; 
+          normals[vi+11] = z3;   
+          normals[vi+12] = x4;
           normals[vi+13] = y2; 
           normals[vi+14] = z4;
-          normals[vi+15] = x2; 
+          normals[vi+15] = x2;
           normals[vi+16] = y1; 
           normals[vi+17] = z2;
+
+          texture_coords[ti] = u1; 
+          texture_coords[ti+1] = v1; 
+          texture_coords[ti+2] = u1;
+          texture_coords[ti+3] = v2; 
+          texture_coords[ti+4] = u2; 
+          texture_coords[ti+5] = v1;
+          texture_coords[ti+6] = u1; 
+          texture_coords[ti+7] = v2; 
+          texture_coords[ti+8] = u2;
+          texture_coords[ti+9] = v2; 
+          texture_coords[ti+10] = u2; 
+          texture_coords[ti+11] = v1;
 
           k += 6;
         }
@@ -263,7 +336,8 @@
 
       return {
         vertices: vertices,
-        normals: normals
+        normals: normals,
+        texture_coords: texture_coords
       };
     }
 
