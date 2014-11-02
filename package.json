@@ -1,10 +1,10 @@
 {
   "name": "gl-utils",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Bare-bones WebGL utility library",
   "repository": {
     "type": "git",
-    "url": "https://github.com/tsherif/oFactory.git"
+    "url": "https://github.com/tsherif/gl-utils"
   },
   "author": {
     "name": "Tarek Sherif",

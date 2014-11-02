@@ -25,8 +25,8 @@
   "use strict";
 
   window.glUtils = {
-    getGL: function getGL(canvas) {
-      var gl = canvas.getContext("experimental-webgl");
+    getGL: function(canvas) {
+      var gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
       gl.viewport(0, 0, canvas.width, canvas.height);
 
       return gl;
@@ -61,7 +61,7 @@
       return program;
     },
 
-    getGLVars: function getGLVars(gl, program, vars) {
+    getGLVars: function(gl, program, vars) {
       var gl_vars = {};
       var attributes = vars.attributes || [];
       var uniforms = vars.uniforms || [];
@@ -75,7 +75,7 @@
       return gl_vars;
     },
 
-    setBuffer: function setBuffer(gl, attribute, data, item_size, type) {
+    setBuffer: function(gl, attribute, data, item_size, type) {
       type = type || gl.FLOAT;
       var buffer = gl.createBuffer();
 
@@ -83,9 +83,19 @@
       gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
       gl.vertexAttribPointer(attribute, item_size, type, false, 0, 0);
       gl.enableVertexAttribArray(attribute);
+
+      return buffer;
     },
 
-    createBox: function createBox(options) {
+    enableBuffer: function(gl, attribute, buffer, item_size) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      gl.vertexAttribPointer(attribute, item_size, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(attribute);
+
+      return buffer;
+    },
+
+    createBox: function(options) {
       options = options || {};
 
       var dimensions = options.dimensions || [1, 1, 1];

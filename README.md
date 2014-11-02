@@ -37,10 +37,18 @@ References to shader attributes and uniforms can be acquired using `glUtils.getG
 as values, e.g. `gl_vars.aPosition`, `gl_vars.uMVP`.
 
 Attribute buffers can be prepared using `glUtils.setBuffer()`, passing the WebGL context, 
-attribute reference, data and item size as arguments:
+attribute reference, data and item size as arguments. The created buffer object is returned:
 
 ```JavaScript
-  glUtils.setBuffer(gl, gl_vars.aPosition, vertices, 3);
+  var position_buffer = glUtils.setBuffer(gl, gl_vars.aPosition, vertices, 3);
+```
+
+When switching between programs, it might be necessary to rebind buffer objects, 
+and this can be done using `glUtils.enableBuffer()`, passing the WebGL context, 
+attribute reference, buffer object and item size as arguments:
+
+```JavaScript
+  glUtils.enableBuffer(gl, gl_vars.aPosition, position_buffer, 3);
 ```
 
 Finally, `glUtils` contains two utility methods for creating the geometry of basic shapes:
@@ -57,4 +65,5 @@ Finally, `glUtils` contains two utility methods for creating the geometry of bas
   });
 ```
 
-Both return objects containing properties `vertices`, the vertex positions, and `normals`, the vertex normals.
+Both return objects containing properties `vertices`, the vertex positions, `normals`, the vertex normals, and
+`texture_coords` containing the texture coordinates.
