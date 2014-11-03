@@ -66,4 +66,4 @@ Finally, `glUtils` contains two utility methods for creating the geometry of bas
 ```
 
 Both return objects containing properties `vertices`, the vertex positions, `normals`, the vertex normals, and
-`texture_coords` containing the texture coordinates.
+`texture_coords`, the texture coordinates.
