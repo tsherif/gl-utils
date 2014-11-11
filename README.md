@@ -51,6 +51,13 @@ attribute reference, buffer object and item size as arguments:
   glUtils.enableBuffer(gl, gl_vars.aPosition, position_buffer, 3);
 ```
 
+Textures can be loaded using `glUtils.loadTexture()`, which takes the WebGL
+context, texture unit and image object as arguments:
+
+```JavaScript
+  glUtils.loadTexture(gl, gl.TEXTURE0, texture_image);
+````
+
 Finally, `glUtils` contains two utility methods for creating the geometry of basic shapes:
 
 ```JavaScript
