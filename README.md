@@ -1,7 +1,7 @@
 glUtils
 ========
 
-glUtils is a bare-bones WebGL library abscracting away the more common boilerplate WebGL code,
+glUtils is a bare-bones WebGL library abstracting away the more common boilerplate WebGL code,
 while still allowing one to use the API directly.
 
 glUtils was used in some of [my WebGL experiments](http://tareksherif.ca/#experiments).
