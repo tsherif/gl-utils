@@ -58,6 +58,17 @@ context, texture unit and image object as arguments:
   glUtils.loadTexture(gl, gl.TEXTURE0, texture_image);
 ````
 
+`glUtils.loadTexture()` defaults to common options for filtering and wrap modes. These can be overridden by passing it additional options:
+
+```JavaScript
+  glUtils.loadTexture(gl, gl.TEXTURE0, texture_image, {
+    min_filter: gl.LINEAR,
+    mag_filter: gl.LINEAR,
+    wrap_s: gl.CLAMP_TO_EDGE,
+    wrap_t: gl.CLAMP_TO_EDGE
+  });
+````
+
 Finally, `glUtils` contains two utility methods for creating the geometry of basic shapes:
 
 ```JavaScript
