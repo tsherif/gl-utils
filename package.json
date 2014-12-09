@@ -1,6 +1,6 @@
 {
   "name": "gl-utils",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Bare-bones WebGL utility library",
   "repository": {
     "type": "git",

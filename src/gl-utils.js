@@ -95,16 +95,28 @@
       return buffer;
     },
 
-    loadTexture: function(gl, texture_unit, texture_image) {
+    loadTexture: function(gl, texture_unit, texture_image, options) {
+      options = options || {};
+
       var texture = gl.createTexture();
+      var mag_filter = options.mag_filter || gl.LINEAR;
+      var min_filter = options.min_filter || gl.LINEAR_MIPMAP_NEAREST;
+      var wrap_s = options.wrap_s || gl.REPEAT;
+      var wrap_t = options.wrap_t || gl.REPEAT;
 
       gl.activeTexture(texture_unit);
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texture_image);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
-      gl.generateMipmap(gl.TEXTURE_2D);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, mag_filter);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, min_filter);
+
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap_s);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap_t);
+
+      if (min_filter === gl.LINEAR_MIPMAP_NEAREST || min_filter === gl.LINEAR_MIPMAP_LINEAR) {
+        gl.generateMipmap(gl.TEXTURE_2D);
+      }
 
       return texture;
     },
