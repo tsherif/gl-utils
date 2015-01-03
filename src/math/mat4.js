@@ -485,8 +485,8 @@
       m[15] = 1;
     },
 
-    perspective: function(m, fov, aspect, near, far) {
-      var top = near * Math.tan(fov / 2);
+    perspective: function(m, yfov, aspect, near, far) {
+      var top = near * Math.tan(yfov / 2);
       var right = top * aspect;
 
       m[0]  = near / right;
