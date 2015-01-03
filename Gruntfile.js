@@ -12,6 +12,7 @@ module.exports = function(grunt) {
       build: {
         src: [
           "src/gl-utils.js",
+          "src/math/*.js"
         ],
         dest: "build/<%= pkg.name %>.min.js"
       }
@@ -43,7 +44,7 @@ module.exports = function(grunt) {
             glUtils: true
           }
         },
-        src: "src/*.js",
+        src: "<%= uglify.build.src %>",
       },
     }
   });
