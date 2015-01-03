@@ -69,7 +69,7 @@ context, texture unit and image object as arguments:
   });
 ````
 
-Finally, `glUtils` contains two utility methods for creating the geometry of basic shapes:
+`glUtils` also provides two utility methods for creating the geometry of basic shapes:
 
 ```JavaScript
   var sphere = glUtils.createSphere({
