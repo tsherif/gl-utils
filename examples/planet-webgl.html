@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<!--
+  The MIT License (MIT)
+
+  Copyright (c) 2014 Tarek Sherif
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy of
+  this software and associated documentation files (the "Software"), to deal in
+  the Software without restriction, including without limitation the rights to
+  use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+  the Software, and to permit persons to whom the Software is furnished to do so,
+  subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+  FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+  IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+-->
+
+<!--
+  Orbital system used to demonstrate several
+  aspects of glUtils functionality:
+  - Setting up program (create context, compile/link
+    shaders, get variable locations)
+  - Multiple programs (for shadow mapping)
+  - Texture mapping
+  - glUtils.mat4 for matrix operations
+-->
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Planet WebGL</title>
+    <style>
+      html {
+        height: 100%;
+        overflow: hidden;
+      }
+      
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      
+      .warning {
+        color: red;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="compatibility-warning" class="warning" style="display:none">
+      Your browser does not seem to support functionality required for this experiment.<BR>
+      <a href="http://www.mozilla.org/en-US/firefox/new/">Mozilla Firefox</a> or
+      <a href="https://www.google.com/intl/en/chrome/browser/">Google Chrome</a> are recommended for best viewing.
+    </div>
+    <canvas id="webgl"></canvas>
+    <script src="../src/gl-utils.js"></script>
+    <script src="../src/math/vec3.js"></script>
+    <script src="../src/math/mat4.js"></script>
+    <script id="shadow-vertex-shader" type="x-vertex-shader">
+      attribute vec4 aPosition;
+      uniform mat4 uMVP;
+      void main() {
+        gl_Position = uMVP * aPosition;
+      }
+    </script>
+    <script id="shadow-fragment-shader" type="x-fragment-shader">
+      precision mediump float;
+ 
+      void main() {
+        const vec4 bitShift = vec4(1.0, 256.0, 256.0 * 256.0, 256.0 * 256.0 * 256.0);
+        const vec4 bitMask = vec4(1.0 / 256.0, 1.0 / 256.0, 1.0 / 256.0,  0.0);
+        vec4 rgbaDepth = fract(gl_FragCoord.z * bitShift);
+        rgbaDepth -= rgbaDepth.gbaa * bitMask;
+
+        gl_FragColor = rgbaDepth;
+      }
+    </script> 
+    <script id="vertex-shader" type="x-vertex-shader">
+      attribute vec4 aPosition;
+      attribute vec4 aNormal;
+      attribute vec2 aTexCoord;
+      uniform mat4 uModelMatrix;
+      uniform mat4 uMVP;
+      uniform mat4 uNormalMatrix;
+      uniform mat4 uMVPFromLight;
+      varying vec3 vPosition;
+      varying vec3 vNormal;
+      varying vec2 vTexCoord;
+      varying vec4 vPositionFromLight;
+      varying vec3 vModelPosition;
+
+      void main() {
+        gl_Position = uMVP * aPosition;
+
+        vModelPosition = vec3(aPosition);
+        vPosition = vec3(uModelMatrix * aPosition);
+        vNormal = vec3(uNormalMatrix * aNormal);
+        vTexCoord = aTexCoord;
+
+        vPositionFromLight = uMVPFromLight * aPosition;
+      }
+    </script>
+    <script id="fragment-shader" type="x-fragment-shader">
+      precision mediump float;
+      uniform vec3 uLightColor;
+      uniform vec3 uLightPosition;
+      uniform vec3 uAmbientLight;
+      uniform vec3 uEyePosition;
+      uniform float uShininess;
+      uniform float uTime;
+      uniform sampler2D uShadowMap;
+      uniform sampler2D uTextureMap;
+
+      varying vec3 vPosition;
+      varying vec3 vNormal;
+      varying vec2 vTexCoord;
+      varying vec4 vPositionFromLight;
+      varying vec3 vModelPosition;
+
+      float unpackDepth(const in vec4 rgbaDepth) {
+        const vec4 bitShift = vec4(1.0, 1.0 / 256.0, 1.0 / (256.0 * 256.0), 1.0 / (256.0 * 256.0 * 256.0));
+
+        return dot(rgbaDepth, bitShift);
+      }
+
+      void main() {
+        vec3 shadowCoord = (vPositionFromLight.xyz / vPositionFromLight.w) / 2.0 + 0.5;
+        vec4 rgbaDepth = texture2D(uShadowMap, shadowCoord.xy);
+        float depth = unpackDepth(rgbaDepth);
+
+        vec4 baseColor = texture2D(uTextureMap, vTexCoord * vec2(3.0, 1.5) - vec2(0.0, 0.25));
+
+        vec3 normal = normalize(vNormal);
+        vec3 eyeDirection = normalize(uEyePosition - vPosition);
+        vec3 lightDirection = normalize(uLightPosition - vPosition);
+        vec3 reflectionDirection = reflect(-lightDirection, normal);
+        float nDotL = max(dot(lightDirection, normal), 0.0);
+        vec3 diffuse = uLightColor * nDotL;
+        vec3 ambient = uAmbientLight;
+        vec3 specular = uLightColor * pow(max(dot(reflectionDirection, eyeDirection), 0.0), uShininess);
+        float visibility = shadowCoord.z > depth + 0.02 ? 1.0 - 0.4 * nDotL : 1.0;
+
+        gl_FragColor = vec4(visibility * (ambient + diffuse + specular) * baseColor.rgb, baseColor.a);
+      }
+    </script> 
+    <script>
+      window.onload = function() {
+        "use strict";
+
+        if (!(window.WebGLRenderingContext && document.createElement('canvas').getContext('experimental-webgl'))) {
+          (function() {
+            document.getElementById("compatibility-warning").style.display = "block";
+          })();
+          return;
+        }
+
+        window.requestAnimationFrame = window.requestAnimationFrame ||
+          window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame ||
+          window.oRequestAnimationFrame || window.msRequestAnimationFrame ||
+          function(callback){
+            return window.setTimeout(callback, 1000 / 60);
+          };
+
+
+        var canvas = document.getElementById("webgl");
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        var mat4 = glUtils.mat4;
+
+        var gl = glUtils.getGL(canvas);
+        gl.program = glUtils.getProgram(gl, "vertex-shader", "fragment-shader");
+
+        var texture_image = new Image();
+
+        texture_image.onload = function() {
+          glUtils.loadTexture(gl, gl.TEXTURE1, texture_image, drawScene);
+        
+          drawScene();
+        };
+
+        texture_image.src = "img/khronos_webgl.png";
+
+        gl.clearColor(0, 0, 0, 1.0);
+        gl.enable(gl.DEPTH_TEST);
+        gl.depthFunc(gl.LEQUAL);
+
+        var main_vars = glUtils.getGLVars(gl, gl.program, {
+          attributes: ["aPosition", "aNormal", "aTexCoord"],
+          uniforms: ["uMVP", "uModelMatrix", "uNormalMatrix", "uLightPosition", "uLightColor", "uAmbientLight", "uShininess", "uEyePosition", "uMVPFromLight", "uShadowMap", "uTextureMap"]
+        });
+
+        // Set up shadow map.
+
+        gl.shadow_program = glUtils.getProgram(gl, "shadow-vertex-shader", "shadow-fragment-shader");
+
+        var shadow_vars = glUtils.getGLVars(gl, gl.shadow_program, {
+         attributes: ["aPosition"],
+         uniforms: ["uMVP"]
+        });
+
+        var framebuffer = gl.createFramebuffer();
+        var texture = gl.createTexture();
+        var depth_buffer = gl.createRenderbuffer();
+        var offscreen = {
+          x: 1024,
+          y: 1024
+        };
+
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, offscreen.x, offscreen.y, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        framebuffer.texture = texture;
+
+        gl.bindRenderbuffer(gl.RENDERBUFFER, depth_buffer);
+        gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, offscreen.x, offscreen.y);
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+
+        gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, depth_buffer);
+
+        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+          console.log("Frame buffer error: " + gl.checkFramebufferStatus(gl.FRAMEBUFFER).toString());
+        }
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, framebuffer.texture);
+
+        // Prepare objects
+        var moons = [];
+        var num_moons = 2;
+        var current_radius;
+        var orbit_radius;
+
+        var colors = [
+          [1, 0, 0, 1],
+          [0, 1, 0, 1],
+          [0, 0, 1, 1],
+          [1, 1, 0, 1],
+          [1, 0, 1, 1],
+          [0, 1, 1, 1],
+          [1, 1, 1, 1]
+        ];
+
+        current_radius = 0.5;
+
+        var sphere = glUtils.createSphere({
+          long_bands: 32,
+          lat_bands: 32,
+          radius: 1
+        });
+
+        var main_position_buffer = glUtils.setBuffer(gl, main_vars.aPosition, sphere.vertices, 3);
+        var main_normal_buffer = glUtils.setBuffer(gl, main_vars.aNormal, sphere.normals, 3);
+        var main_texture_buffer = glUtils.setBuffer(gl, main_vars.aTexCoord, sphere.texture_coords, 2);
+        var shadow_position_buffer = glUtils.setBuffer(gl, shadow_vars.aPosition, sphere.vertices, 3);   
+
+        var planet = {
+          translation: {
+            x: 0,
+            y: 0,
+            z: 0
+          },
+          rotation: {
+            x: 0,
+            y: 0.005,
+            z: 0
+          },
+          rotation_matrix: mat4.create(),
+          scale: current_radius
+        };        
+         
+        var starting_axis;
+        var starting_side = 1;
+        var translation;
+
+        orbit_radius = current_radius + 0.2;
+
+        while(num_moons--) {
+
+          current_radius = 0.1;
+
+          translation = {
+            x: 0,
+            y: 0,
+            z: 0
+          };
+
+          translation.x = starting_side * orbit_radius;
+          
+          moons.push({
+            translation: translation,
+            rotation: {
+              x: 0,
+              y: 0.01,
+              z: 0
+            },
+            scale: current_radius,
+          });
+
+          orbit_radius += current_radius;
+          starting_side *= -1;
+        }
+
+        
+        // Prepare shader parameters.
+
+        var eye = {
+          x: 0,
+          y: 0,
+          z: 1.9
+        };
+        var at = {
+          x: 0,
+          y: 0,
+          z: 0
+        };
+
+        var view_matrix = mat4.create();
+        var proj_matrix = mat4.create();
+
+
+        var light_position = [1.5, 1.0, 2 * eye.z];
+        var shininess = 35;
+
+        var model_matrix = mat4.create();
+        var norm_matrix = mat4.create();
+        var translation_matrix = mat4.create();
+        var rotationx_matrix = mat4.create();
+        var rotationy_matrix = mat4.create();
+        var rotationz_matrix = mat4.create();
+        var scale_matrix = mat4.create();
+
+        function drawMoonShadow(moon) {
+          moon.shadow_mvp = drawObject(moon, shadow_vars);
+        }
+
+        function drawMoonMain(moon) {
+          gl.uniformMatrix4fv(main_vars.uMVPFromLight, false, moon.shadow_mvp);
+          drawObject(moon, main_vars);
+        }
+
+        var axis_offsets = [0.25, -0.25];
+        function drawObject(object, gl_vars) { 
+          var mvp_matrix = object.mvp_matrix || mat4.create();
+
+          var rotation_matrix = object.rotation_matrix;
+          var s = object.scale;
+          var t = object.translation;
+          var r = object.rotation;
+
+          if (!rotation_matrix) {
+            rotation_matrix = mat4.create();
+            mat4.rotationZ(rotation_matrix, Math.PI * (axis_offsets.pop() || 0));
+          }
+
+          mat4.scaling(scale_matrix, s);
+          mat4.translation(translation_matrix, t.x, t.y, t.z);
+          mat4.rotationX(rotationx_matrix, r.x);
+          mat4.rotationY(rotationy_matrix, r.y);
+          mat4.rotationZ(rotationz_matrix, r.z);
+
+          mat4.mult(rotation_matrix, rotation_matrix, rotationx_matrix);
+          mat4.mult(rotation_matrix, rotation_matrix, rotationy_matrix);
+          mat4.mult(rotation_matrix, rotation_matrix, rotationz_matrix);
+          object.rotation_matrix = rotation_matrix;
+
+          mat4.mult(model_matrix, translation_matrix, scale_matrix);
+          mat4.mult(model_matrix, rotation_matrix, model_matrix);
+          
+          gl.uniformMatrix4fv(gl_vars.uModelMatrix, false, model_matrix);
+          mat4.copy(norm_matrix, model_matrix);
+          mat4.invert(norm_matrix);
+          mat4.transpose(norm_matrix);
+          mat4.mult(mvp_matrix, view_matrix, model_matrix);
+          mat4.mult(mvp_matrix, proj_matrix, mvp_matrix);
+
+          gl.uniform3f(gl_vars.uEyePosition, eye.x, eye.y, eye.z);
+
+          gl.uniformMatrix4fv(gl_vars.uMVP, false, mvp_matrix);
+          gl.uniformMatrix4fv(gl_vars.uNormalMatrix, false, norm_matrix);            
+          
+          gl.drawArrays(gl.TRIANGLES, 0, sphere.vertices.length / 3);
+
+          return mvp_matrix;
+        }
+
+        function drawScene() {
+          requestAnimationFrame(drawScene);
+
+          gl.useProgram(gl.shadow_program);
+          gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+          gl.viewport(0, 0, offscreen.x, offscreen.y);
+
+
+          glUtils.enableBuffer(gl, shadow_vars.aPosition, shadow_position_buffer, 3);
+
+          gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+          mat4.perspective(proj_matrix, Math.PI / 3, offscreen.x / offscreen.y, 1, 100);
+          mat4.lookAt(view_matrix, 
+            light_position,
+            [0, 0, 0],
+            [0, 1, 0]
+          );
+
+          var planet_shadow_mvp = drawObject(planet, shadow_vars);
+          moons.forEach(drawMoonShadow);
+
+          gl.disableVertexAttribArray(shadow_vars.aPosition);
+
+          gl.useProgram(gl.program);
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+          gl.viewport(0, 0, canvas.width, canvas.height);
+
+          glUtils.enableBuffer(gl, main_vars.aPosition, main_position_buffer, 3);
+          glUtils.enableBuffer(gl, main_vars.aNormal, main_normal_buffer, 3);
+          glUtils.enableBuffer(gl, main_vars.aTexCoord, main_texture_buffer, 2);
+          
+          gl.uniform3f(main_vars.uLightColor, 0.7, 0.7, 0.7);
+          gl.uniform3fv(main_vars.uLightPosition, light_position);
+          gl.uniform3f(main_vars.uAmbientLight, 0.2, 0.2, 0.2);
+          gl.uniform1f(main_vars.uShininess, shininess);
+          
+          mat4.perspective(proj_matrix, Math.PI / 3, canvas.width / canvas.height, 1, 100);
+          mat4.lookAt(view_matrix, 
+            [eye.x, eye.y, eye.z],
+            [0, 0, 0],
+            [0, 1, 0]
+          );
+
+          gl.uniform1i(main_vars.uShadowMap, 0);
+          gl.uniform1i(main_vars.uTextureMap, 1);
+
+          gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+          gl.uniformMatrix4fv(main_vars.uMVPFromLight, false, planet_shadow_mvp);
+          drawObject(planet, main_vars);
+
+          moons.forEach(drawMoonMain);
+
+          gl.disableVertexAttribArray(main_vars.aPosition);
+          gl.disableVertexAttribArray(main_vars.aNormal);
+          gl.disableVertexAttribArray(main_vars.aTexCoord);
+        }
+
+        window.onresize = function() {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+        
+          gl.viewport(0, 0, canvas.width, canvas.height);
+          mat4.perspective(proj_matrix, Math.PI / 3, canvas.width / canvas.height, 1, 100);
+        }
+
+      };
+    </script>
+  </body>
+</html>

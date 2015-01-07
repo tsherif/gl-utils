@@ -4,7 +4,7 @@ glUtils
 glUtils is a bare-bones WebGL library abstracting away the more common boilerplate WebGL code,
 while still allowing one to use the API directly.
 
-glUtils was used in some of [my WebGL experiments](http://tareksherif.ca/#experiments).
+Demonstrations of glUtils functionality can be found in the `examples` directory and in most of [my WebGL experiments](http://tareksherif.ca/#experiments).
 
 Usage
 ------

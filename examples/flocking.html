@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<!--
+  The MIT License (MIT)
+
+  Copyright (c) 2014 Tarek Sherif
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy of
+  this software and associated documentation files (the "Software"), to deal in
+  the Software without restriction, including without limitation the rights to
+  use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+  the Software, and to permit persons to whom the Software is furnished to do so,
+  subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+  FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+  IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+-->
+
+<!--
+  Implementation of flocking behaviour used
+  to demonstrate functionality of 
+  glUtils.vec3 module.
+-->
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Flocking</title>
+    <style>
+      html {
+        height: 100%;
+        overflow: hidden;
+      }
+      
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      
+      #canvas {
+        background-color: #CCCCCC;
+        width: 100%;
+        height: 100%;
+      }
+      
+      .warning {
+        color: red;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="compatibility-warning" class="warning" style="display:none">
+      Your browser does not seem to support functionality required for this experiment.<BR>
+      <a href="http://www.mozilla.org/en-US/firefox/new/">Mozilla Firefox</a> or
+      <a href="https://www.google.com/intl/en/chrome/browser/">Google Chrome</a> are recommended for best viewing.
+    </div>
+    <canvas id="canvas"></canvas>
+    <script src="../src/gl-utils.js"></script>
+    <script src="../src/math/vec3.js"></script>
+    <script src="../src/math/mat4.js"></script>
+    <script>
+      "use strict";
+
+      window.onload = function() {
+        if (!document.createElement("canvas")) {
+          (function() {
+             var warning = document.getElementById("compatibility-warning");
+             warning.style.display = "block";
+          })();
+          return;
+        }
+        
+        var vec3 = glUtils.vec3;
+
+        var canvas = document.getElementById("canvas");
+        var context = canvas.getContext("2d");
+                
+        canvas.width = document.body.clientWidth;
+        canvas.height = document.body.clientHeight;   
+                
+        window.onresize = function() {
+          canvas.width = document.body.clientWidth;
+          canvas.height = document.body.clientHeight;
+        };
+
+        var radius = 100;
+        var separation = 50;
+        var boids = [];
+        var boid;
+        var num_boids = 100;
+        while(num_boids--) {
+          boid = createBoid(Math.random() * 2 + 1, 0.01);
+          boid.position[0] = Math.random() * canvas.width;
+          boid.position[1] = Math.random() * canvas.height;
+          boid.velocity[0] = Math.random() * 4 - 2;
+          boid.velocity[1] = Math.random() * 4 - 2;
+
+          boids.push(boid);
+        }        
+
+        var acceleration = vec3.create();
+
+        (function drawFrame() {  
+          requestAnimationFrame(drawFrame);
+          context.clearRect(0, 0, canvas.width, canvas.height);
+
+          boids.forEach(function(boid) {
+            var sep = separate(boid, boids);
+            var ali = align(boid, boids);
+            var coh = cohesion(boid, boids);
+
+            vec3.scale(sep, 2.0);
+            vec3.scale(ali, 1.0);
+            vec3.scale(coh, 1.0);
+
+            vec3.add(acceleration, sep, ali);
+            vec3.add(acceleration, acceleration, coh);
+            limitVector(acceleration, boid.maxsteering);
+
+            vec3.add(boid.velocity, boid.velocity, acceleration);
+            limitVector(boid.velocity, boid.maxspeed);
+
+            vec3.add(boid.position, boid.position, boid.velocity);
+
+            if (boid.position[0] < -40) {
+              boid.position[0] = canvas.width + 40;
+            }
+            if (boid.position[1] < -40) {
+              boid.position[1] = canvas.height + 40;
+            }
+            if (boid.position[0] > canvas.width + 40) {
+              boid.position[0] = -40;
+            }
+            if (boid.position[1] > canvas.height + 40) {
+              boid.position[1] = -40;
+            }
+
+            boid.draw(context);
+          });
+        })();
+
+        function separate(boid, boids) {
+          var average = vec3.create();
+          var diff = vec3.create();
+          var count;
+
+          boids.forEach(function(other) {
+            var d;
+
+            vec3.sub(diff, boid.position, other.position);
+            d = vec3.length(diff);
+            if (boid !== other && d < separation) {
+              vec3.sub(diff, boid.position, other.position);
+              vec3.scale(diff, 1 / d);
+              vec3.add(average, average, diff)
+              count++;
+            }
+          });
+
+          if (count > 0) {
+            vec3.normalize(average);
+            vec3.scale(average, boid.maxspeed);
+            vec3.sub(average, boid.velocity);
+          }
+
+          return average;
+        }
+
+        function align(boid, boids) {
+          var average = vec3.create();
+          var diff = vec3.create();
+          var count = 0;
+          var d;
+
+          boids.forEach(function(other) {
+            vec3.sub(diff, boid.position, other.position);
+            d = vec3.length(diff);
+
+            if (boid !== other && d < radius) {
+              vec3.add(average, average, other.velocity);
+              count++;
+            }
+          });
+
+          if (count > 0) {
+            vec3.normalize(average);
+            vec3.scale(average, boid.maxspeed);
+            vec3.sub(average, average, boid.velocity);
+          }
+
+          return average;
+        }
+
+        function cohesion(boid, boids) {
+          var average = vec3.create();
+          var steering = vec3.create();
+          var diff = vec3.create();
+          var count = 0;
+          var d;
+
+          boids.forEach(function(other) {
+            vec3.sub(diff, boid.position, other.position);
+            d = vec3.length(diff);
+
+            if (boid !== other && d < radius) {
+              vec3.add(average, average, other.position);
+              count++;
+            }
+          });
+
+          if (count > 0) {
+            vec3.scale(average, 1 / count);
+            vec3.sub(steering, average, boid.position);
+            vec3.normalize(steering);
+            vec3.scale(steering, boid.maxspeed);
+            vec3.sub(steering, steering, boid.velocity);
+          }
+
+          return steering;
+        }
+
+        function limitVector(v, limit) {
+          if (vec3.length(v) > limit) {
+            vec3.normalize(v);
+            vec3.scale(v, limit);
+          }
+        }
+
+        function createBoid(maxspeed, maxsteering, color) {
+          var boid = {
+            position: vec3.create(),
+            velocity: vec3.create(),
+            acceleration: vec3.create(),
+            maxspeed: maxspeed || 10,
+            maxsteering: maxsteering || 1,
+            color: color || "#FF0000",
+            draw: function(context) {
+              var x = boid.position[0];
+              var y = boid.position[1];
+
+              var rotation = Math.atan2(boid.velocity[1], boid.velocity[0]);
+
+              context.save();
+              context.translate(x, y);
+              context.rotate(rotation);
+              context.fillStyle = boid.color;
+              context.beginPath();
+              context.moveTo(40, 0);
+              context.lineTo(0, 10);
+              context.lineTo(0, -10);
+              context.closePath();
+              context.fill();
+              context.restore();
+
+            }
+          };
+
+          return boid;
+        }
+      };
+    </script>
+  </body>
+</html>
