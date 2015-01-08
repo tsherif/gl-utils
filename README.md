@@ -19,7 +19,7 @@ A program is set up using `glUtils.getProgram()` and passing it the WebGL contex
 in the page containing the vertex and fragment shader code:
 
 ```JavaScript
-  var program = glUtils.getGL(gl, "vertex-shader", "fragment-shader");
+  var program = glUtils.getProgram(gl, "vertex-shader", "fragment-shader");
 ```
 
 Any errors in the compilation or linking will be printed to the console.
