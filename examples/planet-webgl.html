@@ -188,6 +188,7 @@
         texture_image.src = "img/khronos_webgl.png";
 
         gl.clearColor(0, 0, 0, 1.0);
+        gl.enable(gl.CULL_FACE);
         gl.enable(gl.DEPTH_TEST);
         gl.depthFunc(gl.LEQUAL);
 
